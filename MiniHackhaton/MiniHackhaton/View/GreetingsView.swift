@@ -14,17 +14,17 @@ struct GreetingsView: View {
         VStack(spacing: 16) {
             Spacer()
 
-            Image(systemName: "leaf.fill")
-                .font(.system(size: 44))
-                .foregroundStyle(.white)
+            Image("AppLogo")
+                .resizable()
+                .scaledToFill()
                 .frame(width: 92, height: 92)
-                .background(Color.accentColor.gradient, in: RoundedRectangle(cornerRadius: 22))
+                .clipShape(RoundedRectangle(cornerRadius: 22))
                 .shadow(color: Color.accentColor.opacity(0.35), radius: 14, y: 8)
                 .scaleEffect(appeared ? 1 : 0.7)
                 .opacity(appeared ? 1 : 0)
                 .accessibilityHidden(true)
 
-            Text("Welcome to NutriDe")
+            Text("Welcome to MyBodyGoodnees")
                 .font(.system(.largeTitle, design: .rounded).bold())
                 .multilineTextAlignment(.center)
                 .padding(.top, 8)

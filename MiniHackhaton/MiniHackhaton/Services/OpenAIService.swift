@@ -120,6 +120,85 @@ final class OpenAIService {
     Reply in English, in plain text without markdown or emoji because replies are read \
     aloud by VoiceOver. Follow the requested line format exactly. Do not give medical diagnoses.
     """
+
+    /// Asks the model to rate the healthiness of today as a single 0–100 score, weighing
+    /// both nutrition intake and physical activity. Powers the home `TodayProgressBar`.
+    /// `summary` is the dashboard's pre-built data sentence (scan counts, calories, top
+    /// nutrients) with an activity sentence appended by the caller.
+    nonisolated func dailyHealthScore(summary: String, profile: UserProfile? = nil) async throws -> DailyHealthScore {
+        var user = summary
+        if let profile {
+            user += " User profile: \(profile.promptDescription)."
+        }
+        user += """
+         Based on that nutrition and activity data, rate how healthy the user's day is as a \
+        single integer from 0 to 100, where 0 is very unhealthy and 100 is excellent. Weigh \
+        both nutrition quality and physical activity; more activity offsetting the calories \
+        eaten should raise the score. Reply in exactly two lines with this format and nothing else:
+        SCORE: an integer from 0 to 100.
+        REASON: a brief one-sentence justification.
+        """
+
+        let raw = try await complete(system: Self.dailyHealthScoreSystemPrompt, user: user)
+        guard let parsed = DailyHealthScore(parsing: raw) else {
+            throw OpenAIError.emptyReply
+        }
+        return parsed
+    }
+
+    private static let dailyHealthScoreSystemPrompt = """
+    You are a nutrition assistant inside a nutrition-label scanning app. Reply in English, in \
+    plain text without markdown or emoji. Follow the requested line format exactly and always \
+    include a numeric SCORE line. Do not give medical diagnoses.
+    """
+}
+
+/// A 0–100 daily health score parsed from the LLM's SCORE/REASON reply. Fails to init
+/// only when no integer can be found, so callers can fall back to a local calculation.
+struct DailyHealthScore: Equatable {
+    /// Clamped to 0...100.
+    let score: Double
+    let reason: String?
+
+    init?(parsing raw: String) {
+        let cleaned = raw.replacingOccurrences(of: "**", with: "")
+        var foundScore: Double?
+        var foundReason: String?
+
+        for rawLine in cleaned.components(separatedBy: .newlines) {
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+            let upper = line.uppercased()
+            if foundScore == nil, upper.hasPrefix("SCORE"), let value = Self.firstNumber(in: line) {
+                foundScore = min(max(value, 0), 100)
+            } else if upper.hasPrefix("REASON") {
+                let rest = line.dropFirst("REASON".count)
+                    .drop { $0 == ":" || $0 == " " || $0 == "-" }
+                foundReason = String(rest)
+            }
+        }
+
+        // Fallback: no SCORE line, but the reply contains a number somewhere.
+        if foundScore == nil, let value = Self.firstNumber(in: cleaned) {
+            foundScore = min(max(value, 0), 100)
+        }
+
+        guard let score = foundScore else { return nil }
+        self.score = score
+        self.reason = (foundReason?.isEmpty == false) ? foundReason : nil
+    }
+
+    /// First integer/decimal run found in `text`, or nil.
+    private static func firstNumber(in text: String) -> Double? {
+        var number = ""
+        for character in text {
+            if character.isNumber || (character == "." && !number.isEmpty) {
+                number.append(character)
+            } else if !number.isEmpty {
+                break
+            }
+        }
+        return Double(number)
+    }
 }
 
 /// Structured daily advice parsed from the LLM's ASSESSMENT/FOOD/WORKOUT reply.

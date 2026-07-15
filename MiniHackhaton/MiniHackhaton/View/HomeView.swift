@@ -12,6 +12,37 @@ struct HomeView: View {
     @State private var isShowingAdvice = false
     @State private var selectedTodayTab: TodayTab = .nutrition
 
+    /// Activities shown in the "Today" Activity tab. Starts empty; populated with
+    /// dummy data when the user taps Sync (placeholder for real HealthKit sync).
+    @State private var syncedActivities: [SuggestedActivity] = []
+    @State private var isSyncingActivities = false
+
+    /// Total kcal burned by the synced activities. Zero until the user syncs, so the
+    /// progress bar's activity coverage only counts once activities are pulled in.
+    private var syncedActivityBurn: Double {
+        syncedActivities.reduce(0) { $0 + $1.kcalBurned }
+    }
+
+    /// AI-computed 0–100 daily score from OpenAIService, nil until it returns (or on
+    /// failure). Falls back to the local heuristic so the bar always has a value.
+    @State private var aiScore: Double?
+    @State private var isScoringToday = false
+    /// `scoreInputsKey` the cached `aiScore` was computed for. Prevents re-calling the
+    /// API on view reappearance when nutrition and activity are unchanged.
+    @State private var scoredInputsKey: String?
+
+    /// Score shown by the progress bar: prefer the AI value, fall back to the local
+    /// calculation. Nil (empty state) only when there are no scans today.
+    private var displayedScore: Double? {
+        guard !history.todayRecords.isEmpty else { return nil }
+        return aiScore ?? history.todayScore(activityBurn: syncedActivityBurn)
+    }
+
+    /// Changes whenever an input to the score changes, so `.task(id:)` re-asks the model.
+    private var scoreInputsKey: String {
+        "\(history.todayRecords.count)|\(Int(history.todayCalories))|\(Int(syncedActivityBurn))"
+    }
+
     enum TodayTab: String, CaseIterable, Identifiable {
         case nutrition = "Nutrition"
         case activity = "Activity"
@@ -24,9 +55,10 @@ struct HomeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     TodayProgressBar(
-                        score: history.todayScore,
+                        score: displayedScore,
                         caloriesIn: history.todayCalories,
-                        caloriesBurned: SuggestedActivity.totalDailyBurn
+                        caloriesBurned: syncedActivityBurn,
+                        isCalculating: isScoringToday
                     )
                     .cardStyle()
                     adviceSection
@@ -37,6 +69,7 @@ struct HomeView: View {
                 .padding(.vertical, 8)
             }
             .background(Color(.systemGroupedBackground))
+            .task(id: scoreInputsKey) { await refreshTodayScore() }
             .navigationTitle("Hi, \(profileStore.profile?.name ?? "there")!")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -205,41 +238,137 @@ struct HomeView: View {
         }
     }
 
+    @ViewBuilder
     private var activityList: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(SuggestedActivity.daily.enumerated()), id: \.element.id) { index, activity in
-                HStack(spacing: 12) {
-                    Image(systemName: activity.icon)
-                        .font(.callout)
-                        .foregroundStyle(.white)
-                        .frame(width: 32, height: 32)
-                        .background(Color.accentColor.gradient, in: Circle())
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(activity.name)
-                        Text(activity.detail)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("−\(Int(activity.kcalBurned)) kcal")
-                            .font(.system(.body, design: .rounded).weight(.semibold))
-                            .monospacedDigit()
-                            .foregroundStyle(.secondary)
-                        if history.todayCalories > 0 {
-                            let percent = min(Int(activity.kcalBurned / history.todayCalories * 100), 999)
-                            Text("≈ \(percent)% of today's calories")
-                                .font(.caption)
-                                .foregroundStyle(Color.accentColor)
+        if syncedActivities.isEmpty {
+            VStack(spacing: 12) {
+                Image(systemName: "figure.run.circle")
+                    .font(.title)
+                    .foregroundStyle(.tertiary)
+                Text("No activity synced yet today.\nSync to pull in your activities.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+
+                Button {
+                    syncActivities()
+                } label: {
+                    Group {
+                        if isSyncingActivities {
+                            ProgressView()
+                        } else {
+                            Label("Sync", systemImage: "arrow.triangle.2.circlepath")
                         }
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
                 }
-                .padding(.vertical, 10)
-                .accessibilityElement(children: .combine)
-                if index < SuggestedActivity.daily.count - 1 {
-                    Divider()
+                .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.capsule)
+                .controlSize(.regular)
+                .disabled(isSyncingActivities)
+                .padding(.top, 4)
+                .accessibilityHint("Syncs today's activities")
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+        } else {
+            VStack(spacing: 0) {
+                ForEach(Array(syncedActivities.enumerated()), id: \.element.id) { index, activity in
+                    HStack(spacing: 12) {
+                        Image(systemName: activity.icon)
+                            .font(.callout)
+                            .foregroundStyle(.white)
+                            .frame(width: 32, height: 32)
+                            .background(Color.accentColor.gradient, in: Circle())
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(activity.name)
+                            Text(activity.detail)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("−\(Int(activity.kcalBurned)) kcal")
+                                .font(.system(.body, design: .rounded).weight(.semibold))
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                            if history.todayCalories > 0 {
+                                let percent = min(Int(activity.kcalBurned / history.todayCalories * 100), 999)
+                                Text("≈ \(percent)% of today's calories")
+                                    .font(.caption)
+                                    .foregroundStyle(Color.accentColor)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 10)
+                    .accessibilityElement(children: .combine)
+                    if index < syncedActivities.count - 1 {
+                        Divider()
+                    }
                 }
             }
+        }
+    }
+
+    // MARK: - AI score
+
+    /// One sentence describing today's synced activities for the LLM prompt.
+    private var activitySummarySentence: String {
+        guard !syncedActivities.isEmpty else {
+            return " The user has not synced any physical activity today."
+        }
+        let list = syncedActivities
+            .map { "\($0.name) (\($0.detail), about \(Int($0.kcalBurned)) kcal)" }
+            .joined(separator: ", ")
+        return " Today's synced activities: \(list), burning about \(Int(syncedActivityBurn)) kcal in total."
+    }
+
+    /// Asks OpenAIService for the daily health score based on nutrition + activity.
+    /// On failure, clears `aiScore` so `displayedScore` uses the local fallback.
+    @MainActor
+    private func refreshTodayScore() async {
+        let key = scoreInputsKey
+
+        guard !history.todayRecords.isEmpty else {
+            aiScore = nil
+            scoredInputsKey = nil
+            return
+        }
+
+        // Cache hit: already scored these exact inputs, so reuse it (no API call).
+        if scoredInputsKey == key, aiScore != nil { return }
+
+        isScoringToday = true
+        defer { isScoringToday = false }
+        do {
+            let summary = history.todaySummaryPrompt + activitySummarySentence
+            let result = try await OpenAIService.shared.dailyHealthScore(
+                summary: summary,
+                profile: profileStore.profile
+            )
+            guard !Task.isCancelled else { return }
+            withAnimation(.spring(duration: 0.7)) {
+                aiScore = result.score
+            }
+            scoredInputsKey = key
+        } catch {
+            // Leave the cache key unset so the next appearance retries.
+            aiScore = nil
+            scoredInputsKey = nil
+        }
+    }
+
+    /// Simulates syncing activities from an external source by loading dummy data
+    /// after a short delay. Replace with real HealthKit/manual logging later.
+    private func syncActivities() {
+        isSyncingActivities = true
+        Task {
+            try? await Task.sleep(for: .seconds(1))
+            withAnimation(.snappy(duration: 0.3)) {
+                syncedActivities = SuggestedActivity.daily
+            }
+            isSyncingActivities = false
         }
     }
 }
@@ -253,14 +382,17 @@ private extension View {
     }
 }
 
-/// Daily balance gauge: a 0–100 score computed from nutrition intake and activity
-/// (see `ScanHistoryStore.todayScore`), drawn as a fill over three fixed zones
+/// Daily balance gauge: a 0–100 score computed from nutrition intake and activity by
+/// `OpenAIService.dailyHealthScore` (falling back to `ScanHistoryStore.todayScore` when
+/// the network is unavailable), drawn as a fill over three fixed zones
 /// (Bad 0–40, Good 40–70, Healthy 70–100). The fill grows in with a spring.
 private struct TodayProgressBar: View {
     /// Nil until the first scan of the day.
     let score: Double?
     let caloriesIn: Double
     let caloriesBurned: Double
+    /// True while OpenAIService is computing the score.
+    var isCalculating: Bool = false
 
     @State private var appeared = false
 
@@ -283,7 +415,9 @@ private struct TodayProgressBar: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                if let score {
+                if isCalculating {
+                    ProgressView()
+                } else if let score {
                     VStack(alignment: .trailing, spacing: 0) {
                         Text("\(Int(score))")
                             .font(.system(.title2, design: .rounded).bold())

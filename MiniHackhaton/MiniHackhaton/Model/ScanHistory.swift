@@ -87,12 +87,15 @@ final class ScanHistoryStore {
     }
 
     /// 0–100 daily score behind the home progress bar, combining what was eaten with
-    /// what the (dummy) activities burn. Nil until the first scan of the day.
+    /// what the synced activities burn. Nil until the first scan of the day.
     ///
     /// Composition: 70% nutrition quality (average of per-scan class: sehat 100,
     /// cukup sehat 60, kurang sehat 20) + 30% activity coverage (how much of today's
-    /// scanned calories the daily activities neutralize, capped at full coverage).
-    var todayScore: Double? {
+    /// scanned calories `activityBurn` neutralizes, capped at full coverage).
+    ///
+    /// - Parameter activityBurn: total kcal burned by today's synced activities.
+    ///   Zero before the user syncs, so the activity component contributes nothing.
+    func todayScore(activityBurn: Double) -> Double? {
         let records = todayRecords
         guard !records.isEmpty else { return nil }
 
@@ -102,7 +105,7 @@ final class ScanHistoryStore {
             .reduce(0, +) / Double(records.count)
 
         let coverage = todayCalories > 0
-            ? min(SuggestedActivity.totalDailyBurn / todayCalories, 1)
+            ? min(activityBurn / todayCalories, 1)
             : 1
 
         return quality * 0.7 + coverage * 100 * 0.3
