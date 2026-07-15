@@ -36,6 +36,7 @@ struct CameraCaptureView: View {
                             .foregroundStyle(.white)
                             .padding()
                     }
+                    .accessibilityLabel("Tutup kamera")
                     Spacer()
                 }
 
@@ -64,6 +65,8 @@ struct CameraCaptureView: View {
                             )
                     }
                     .padding(.bottom, 40)
+                    .accessibilityLabel("Ambil foto")
+                    .accessibilityHint("Arahkan kamera ke label gizi pada kemasan, lalu ketuk dua kali")
                 }
             }
         }

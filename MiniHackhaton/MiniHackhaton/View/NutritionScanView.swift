@@ -1,14 +1,16 @@
 //
-//  ContentView.swift
-//  nutride
+//  NutritionScanView.swift
+//  MiniHackhaton
 //
 //  Created by Training-28 on 14/07/26.
 //
 
 import PhotosUI
 import SwiftUI
+import UIKit
 
-struct ContentView: View {
+struct NutritionScanView: View {
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
     @State private var capturedImage: UIImage?
     @State private var isShowingCamera = false
     @State private var photosPickerItem: PhotosPickerItem?
@@ -128,6 +130,7 @@ struct ContentView: View {
         classification = nil
         errorMessage = nil
         isProcessing = true
+        announce("Foto diterima. Memindai label gizi, mohon tunggu.")
 
         Task.detached(priority: .userInitiated) {
             do {
@@ -138,6 +141,8 @@ struct ContentView: View {
                     classification = result.classification
                     if result.items.isEmpty {
                         errorMessage = "No nutrition facts recognized. Try a clearer, well-lit photo."
+                    } else {
+                        announce(spokenSummary(for: result.classification))
                     }
                 }
             } catch {
@@ -148,19 +153,37 @@ struct ContentView: View {
             }
         }
     }
+
+    /// Speaks the scan verdict aloud so a VoiceOver user hears the result immediately,
+    /// without having to locate the banner by touch. No-op when VoiceOver is off.
+    private func announce(_ message: String) {
+        guard voiceOverEnabled else { return }
+        UIAccessibility.post(notification: .announcement, argument: message)
+    }
+
+    private func spokenSummary(for classification: HealthClassification) -> String {
+        var summary = "Hasil pemindaian: \(classification.displayLabel), tingkat keyakinan \(Int(classification.confidence * 100)) persen."
+        if !classification.missingFields.isEmpty {
+            summary += " \(classification.missingFields.count) nilai gizi tidak terbaca dan diasumsikan buruk."
+        }
+        return summary
+    }
+}
+
+extension HealthClassification {
+    /// Human-readable form of the raw model label, shared by the banner and VoiceOver announcements.
+    var displayLabel: String {
+        switch label {
+        case "sehat": return "Sehat"
+        case "cukup sehat": return "Cukup Sehat"
+        case "kurang sehat": return "Kurang Sehat"
+        default: return label
+        }
+    }
 }
 
 private struct ClassificationBanner: View {
     let classification: HealthClassification
-
-    private var displayLabel: String {
-        switch classification.label {
-        case "sehat": return "Sehat"
-        case "cukup sehat": return "Cukup Sehat"
-        case "kurang sehat": return "Kurang Sehat"
-        default: return classification.label
-        }
-    }
 
     private var tint: Color {
         switch classification.label {
@@ -174,7 +197,7 @@ private struct ClassificationBanner: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text(displayLabel)
+                Text(classification.displayLabel)
                     .font(.headline)
                     .foregroundStyle(tint)
                 Spacer()
@@ -191,9 +214,10 @@ private struct ClassificationBanner: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+        .accessibilityElement(children: .combine)
     }
 }
 
 #Preview {
-    ContentView()
+    NutritionScanView()
 }
