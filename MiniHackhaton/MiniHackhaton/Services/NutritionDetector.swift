@@ -55,7 +55,7 @@ final class NutritionDetector {
         guard let classifier = HealthClassifier.shared else { throw ClassifierError.modelNotFound }
         let facts = NutritionLabelParser.parse(lines: lines)
         let classification = try classifier.classify(facts)
-        return HealthScanResult(items: items, classification: classification)
+        return HealthScanResult(items: items, classification: classification, facts: facts)
     }
 
     nonisolated private func recognizeNutritionText(in originalImage: UIImage) throws -> (items: [NutritionItem], lines: [String]) {

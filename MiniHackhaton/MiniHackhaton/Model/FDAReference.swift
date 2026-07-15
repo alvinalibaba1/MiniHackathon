@@ -28,6 +28,27 @@ enum NutrientField: String, CaseIterable {
     ]
 
     var isInteger: Bool { Self.integerFields.contains(self) }
+
+    /// Display name used in the dashboard's top-nutrient list.
+    var displayName: String {
+        switch self {
+        case .calories: return "Calories"
+        case .totalFatDV: return "Total Fat"
+        case .satFatDV: return "Saturated Fat"
+        case .transFat: return "Trans Fat"
+        case .cholesterolDV: return "Cholesterol"
+        case .sodiumDV: return "Sodium"
+        case .carbsDV: return "Carbohydrates"
+        case .fiberDV: return "Fiber"
+        case .totalSugars: return "Total Sugars"
+        case .addedSugarsDV: return "Added Sugars"
+        case .protein: return "Protein"
+        case .vitaminDDV: return "Vitamin D"
+        case .calciumDV: return "Calcium"
+        case .ironDV: return "Iron"
+        case .potassiumDV: return "Potassium"
+        }
+    }
 }
 
 /// FDA reference values (21 CFR 101.9(c), 2016/2020 revised Nutrition Facts label) used to
@@ -63,6 +84,22 @@ enum FDAReference {
         .totalSugars: 8.5, .addedSugarsDV: 0, .protein: 9, .vitaminDDV: 0,
         .calciumDV: 6, .ironDV: 8, .potassiumDV: 6,
     ]
+
+    /// Reverse of `percentDV`: approximate mass for a %DV reading, formatted with the
+    /// field's natural unit — e.g. 25 %DV saturated fat → "5 g", 5 %DV sodium → "115 mg".
+    /// Used for display; the stored/classified values stay in %DV.
+    static func massText(fromDV percent: Double, field: NutrientField) -> String? {
+        guard let reference = dailyValue[field] else { return nil }
+        let amount = percent / 100 * reference.amount
+        let formatted: String
+        if amount >= 10 {
+            formatted = String(Int(amount.rounded()))
+        } else {
+            formatted = String(format: "%.1f", amount)
+                .replacingOccurrences(of: ".0", with: "")
+        }
+        return "\(formatted) \(reference.unit)"
+    }
 
     /// Converts a raw amount+unit reading (e.g. 160mg) into %DV for the given field,
     /// rounded to a whole number since the ten %DV inputs are Int64 at the CoreML boundary.

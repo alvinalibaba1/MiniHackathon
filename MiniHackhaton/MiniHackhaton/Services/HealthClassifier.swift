@@ -7,6 +7,18 @@ struct HealthClassification {
     let probabilities: [String: Double]
     /// `NutrientField.rawValue`s that had no reading and were filled from `FDAReference.pessimisticDefault`.
     let missingFields: [String]
+
+    /// Human-readable form of the raw model label (the model was trained with
+    /// Indonesian class names), shared by the result banner, VoiceOver
+    /// announcements, and OpenAI prompts.
+    var displayLabel: String {
+        switch label {
+        case "sehat": return "Healthy"
+        case "cukup sehat": return "Moderate"
+        case "kurang sehat": return "Unhealthy"
+        default: return label
+        }
+    }
 }
 
 /// Bundles a scan's raw display items with the resolved classification, so the UI can show
@@ -14,6 +26,9 @@ struct HealthClassification {
 struct HealthScanResult {
     let items: [NutritionItem]
     let classification: HealthClassification
+    /// Parsed readings keyed by `NutrientField.rawValue` — only fields actually read off the
+    /// label. Used by the daily history (progress bar, top nutrients) on the home dashboard.
+    let facts: [String: Double]
 }
 
 enum ClassifierError: LocalizedError {

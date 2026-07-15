@@ -11,7 +11,7 @@ import SwiftUI
 struct MiniHackhatonApp: App {
     var body: some Scene {
         WindowGroup {
-            NutritionScanView()
+            RootView()
         }
     }
 }

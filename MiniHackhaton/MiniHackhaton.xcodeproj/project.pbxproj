@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		7601F3B5300738AB001D1E46 /* SimulatorCameraClient in Frameworks */ = {isa = PBXBuildFile; productRef = 7601F3B4300738AB001D1E46 /* SimulatorCameraClient */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		7601F32C30062802001D1E46 /* MiniHackhaton.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MiniHackhaton.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7601F3B5300738AB001D1E46 /* SimulatorCameraClient in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +70,7 @@
 			);
 			name = MiniHackhaton;
 			packageProductDependencies = (
+				7601F3B4300738AB001D1E46 /* SimulatorCameraClient */,
 			);
 			productName = MiniHackhaton;
 			productReference = 7601F32C30062802001D1E46 /* MiniHackhaton.app */;
@@ -94,6 +100,9 @@
 			);
 			mainGroup = 7601F32330062802001D1E46;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				7601F3B3300738AB001D1E46 /* XCRemoteSwiftPackageReference "SimulatorCamera" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7601F32D30062802001D1E46 /* Products */;
 			projectDirPath = "";
@@ -250,7 +259,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSCameraUsageDescription = "Need permission for open camera";
+				INFOPLIST_KEY_NSCameraUsageDescription = "NutriDe uses the camera to scan nutrition labels on food packaging.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -292,7 +301,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSCameraUsageDescription = "Need permission for open camera";
+				INFOPLIST_KEY_NSCameraUsageDescription = "NutriDe uses the camera to scan nutrition labels on food packaging.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -345,6 +354,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		7601F3B3300738AB001D1E46 /* XCRemoteSwiftPackageReference "SimulatorCamera" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Akylas/SimulatorCamera";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		7601F3B4300738AB001D1E46 /* SimulatorCameraClient */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7601F3B3300738AB001D1E46 /* XCRemoteSwiftPackageReference "SimulatorCamera" */;
+			productName = SimulatorCameraClient;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 7601F32430062802001D1E46 /* Project object */;
 }
