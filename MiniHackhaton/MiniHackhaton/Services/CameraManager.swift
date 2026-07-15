@@ -1,6 +1,13 @@
 import AVFoundation
-import SimulatorCameraClient
 import SwiftUI
+
+// SimulatorCameraClient is an optional dev-only dependency that streams the
+// Mac's webcam into the iOS Simulator (which has no camera hardware). It is
+// only referenced when building for the Simulator AND the package is actually
+// linked, so the app builds and runs on a real device without it.
+#if targetEnvironment(simulator) && canImport(SimulatorCameraClient)
+import SimulatorCameraClient
+#endif
 
 @Observable
 final class CameraManager: NSObject {
@@ -17,10 +24,12 @@ final class CameraManager: NSObject {
     nonisolated(unsafe) private let session = AVCaptureSession()
     nonisolated(unsafe) private let videoOutput = AVCaptureVideoDataOutput()
 
+    #if targetEnvironment(simulator) && canImport(SimulatorCameraClient)
     // Simulator has no camera hardware — SimulatorCameraOutput bypasses
     // AVCaptureSession entirely and streams frames from a companion Mac app.
     nonisolated(unsafe) private let simulatorOutput = SimulatorCameraOutput()
     nonisolated(unsafe) private var simulatorCaptureStarted = false
+    #endif
     nonisolated(unsafe) private var latestPixelBuffer: CVPixelBuffer?
 
     nonisolated(unsafe) private let sessionQueue = DispatchQueue(label: "camera.session.queue")
@@ -36,13 +45,14 @@ final class CameraManager: NSObject {
         previewLayer.session = session
         previewLayer.videoGravity = .resizeAspectFill
 
-        // No-op on a real device. On Simulator, connects to the companion
-        // app on the Mac (default 127.0.0.1:9876).
+        #if targetEnvironment(simulator) && canImport(SimulatorCameraClient)
+        // Connects to the companion app on the Mac (default 127.0.0.1:9876).
         SimulatorCamera.configure(host: "127.0.0.1", port: 9876)
+        #endif
     }
 
     nonisolated private func configureInputOutput() {
-        #if targetEnvironment(simulator)
+        #if targetEnvironment(simulator) && canImport(SimulatorCameraClient)
         simulatorOutput.setSampleBufferDelegate(self, queue: outputQueue)
         #else
         guard
@@ -95,7 +105,7 @@ final class CameraManager: NSObject {
     private func startCapture() {
         sessionQueue.async { [weak self] in
             guard let self else { return }
-            #if targetEnvironment(simulator)
+            #if targetEnvironment(simulator) && canImport(SimulatorCameraClient)
             guard !self.simulatorCaptureStarted else { return }
             self.simulatorCaptureStarted = true
             self.configureInputOutput()
@@ -114,7 +124,7 @@ final class CameraManager: NSObject {
     func stopSession() {
         sessionQueue.async { [weak self] in
             guard let self else { return }
-            #if targetEnvironment(simulator)
+            #if targetEnvironment(simulator) && canImport(SimulatorCameraClient)
             guard self.simulatorCaptureStarted else { return }
             self.simulatorCaptureStarted = false
             SimulatorCamera.stop()
@@ -131,7 +141,7 @@ final class CameraManager: NSObject {
         guard let pixelBuffer = latestPixelBuffer else { return nil }
         let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
         guard let cgImage = ciContext.createCGImage(ciImage, from: ciImage.extent) else { return nil }
-        #if targetEnvironment(simulator)
+        #if targetEnvironment(simulator) && canImport(SimulatorCameraClient)
         return UIImage(cgImage: cgImage, scale: 1, orientation: .right)
         #else
         // Already rotated upright by the connection's videoRotationAngle.
@@ -149,7 +159,7 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         latestPixelBuffer = pixelBuffer
 
-        #if targetEnvironment(simulator)
+        #if targetEnvironment(simulator) && canImport(SimulatorCameraClient)
         let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
         if let cgImage = ciContext.createCGImage(ciImage, from: ciImage.extent) {
             let image = UIImage(cgImage: cgImage, scale: 1, orientation: .right)
