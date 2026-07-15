@@ -18,8 +18,9 @@ struct ScanDisplayResult: Identifiable {
 }
 
 /// Google Lens-style scanner, presented fullscreen from the home dashboard: the live
-/// camera fills the screen, with gallery and shutter in the bottom bar. Successful
-/// scans are saved into `history` so the dashboard aggregates stay current.
+/// camera fills the screen, with gallery and shutter in the bottom bar. A scan only
+/// reaches `history` once the user confirms consumption on the result sheet, so the
+/// dashboard aggregates reflect what was eaten rather than what was merely scanned.
 struct NutritionScanView: View {
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
     @Environment(\.dismiss) private var dismiss
@@ -28,8 +29,9 @@ struct NutritionScanView: View {
     @State private var isProcessing = false
     @State private var errorMessage: String?
     @State private var scanResult: ScanDisplayResult?
-    /// Set by the result sheet's "Done" button; once the sheet finishes
-    /// dismissing, the camera closes too and the app lands back on home.
+    /// Set when the result sheet's consumption is confirmed; once the sheet finishes
+    /// dismissing, the camera closes too and the app lands back on home. Stays false
+    /// on cancel, keeping the camera up for another scan.
     @State private var finishAfterResult = false
     var history: ScanHistoryStore
 
@@ -104,7 +106,11 @@ struct NutritionScanView: View {
             }
         }) { result in
             ScanResultView(result: result) {
+                history.add(ScanRecord(scan: result.scan))
                 finishAfterResult = true
+                scanResult = nil
+            } onCancel: {
+                // Dropped: nothing reaches history, and the camera stays open for a retry.
                 scanResult = nil
             }
         }
@@ -209,7 +215,8 @@ struct NutritionScanView: View {
                     if scan.items.isEmpty {
                         errorMessage = "Couldn't read the nutrition label. Try again with better lighting."
                     } else {
-                        history.add(ScanRecord(scan: scan))
+                        // Not recorded yet — the result sheet asks the user whether they're
+                        // actually consuming this product first.
                         scanResult = ScanDisplayResult(image: image, scan: scan)
                     }
                 }

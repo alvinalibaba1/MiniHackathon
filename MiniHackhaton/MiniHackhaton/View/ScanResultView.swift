@@ -4,11 +4,18 @@ import UIKit
 /// Result sheet shown after a successful scan: the captured photo, the health
 /// classification banner, and the readings parsed off the label. The banner pops
 /// in with a spring and the rows fade in staggered.
+///
+/// The scan is not recorded anywhere until the user decides here — seeing an
+/// unhealthy verdict and putting the product back is a normal outcome, and the
+/// daily dashboard should only reflect what was actually consumed.
 struct ScanResultView: View {
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
     let result: ScanDisplayResult
-    /// Called by the "Done" button; the presenter closes both this sheet and the camera.
-    var onDone: () -> Void
+    /// Called when the user confirms consumption; the presenter records the scan
+    /// into history, then closes both this sheet and the camera.
+    var onConsume: () -> Void
+    /// Called when the user backs out; the scan is dropped without being recorded.
+    var onCancel: () -> Void
 
     @State private var appeared = false
 
@@ -74,16 +81,46 @@ struct ScanResultView: View {
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Scan Result")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { onDone() }
-                }
-            }
+            .safeAreaInset(edge: .bottom) { decisionBar }
         }
         .onAppear {
             appeared = true
             announce(spokenSummary)
         }
+    }
+
+    // MARK: - Decision
+
+    /// Pinned above the safe area so the choice stays reachable without scrolling
+    /// past the readings.
+    private var decisionBar: some View {
+        VStack(spacing: 10) {
+            Button {
+                onConsume()
+            } label: {
+                Text("Continue Consuming")
+                    .font(.system(.headline, design: .rounded))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .accessibilityHint("Records this product in today's history")
+
+            Button(role: .cancel) {
+                onCancel()
+            } label: {
+                Text("Cancel")
+                    .font(.system(.headline, design: .rounded))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .accessibilityHint("Discards this scan without recording it")
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
+        .background(.bar)
     }
 
     // MARK: - Top nutrients

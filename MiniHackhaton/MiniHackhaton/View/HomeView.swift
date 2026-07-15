@@ -314,10 +314,10 @@ private struct TodayProgressBar: View {
                     zoneLabel("Healthy", tint: .green)
                 }
 
-                HStack(spacing: 8) {
-                    calorieChip(icon: "flame.fill", tint: .orange, text: "\(Int(caloriesIn)) kcal in")
-                    calorieChip(icon: "figure.run", tint: .green, text: "−\(Int(caloriesBurned)) kcal activity")
-                }
+//                HStack(spacing: 8) {
+//                    calorieChip(icon: "flame.fill", tint: .orange, text: "\(Int(caloriesIn)) kcal in")
+//                    calorieChip(icon: "figure.run", tint: .green, text: "−\(Int(caloriesBurned)) kcal activity")
+//                }
             }
         }
         .onAppear { appeared = true }
